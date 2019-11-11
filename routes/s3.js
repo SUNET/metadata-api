@@ -4,6 +4,8 @@ Route to fetch metadata from s3 storage
 
 const express = require('express');
 const router = express.Router();
+const fs = require('fs')
+require('dotenv').config();
 
 // Create AWS object
 var AWS = require('aws-sdk');
@@ -33,5 +35,34 @@ router.get('/', function (req, res) {
             }     
         });
 });
+
+//Function to write object to s3 storage
+router.post('/upload', function (req, res) {
+    // Create S3 service object
+       var s3 = new AWS.S3();
+       
+       //Set default parameters for aws-get-object
+       let uploadParams = {
+           Bucket: "placeholderBucket", 
+           Key: "placeholderKey",
+           Body: "placeholderBody"
+       }; 
+   
+       //Set parameters from env
+       uploadParams.Bucket = process.env.Bucket;
+       uploadParams.Key = process.env.uploadKey;
+       uploadParams.Body = JSON.stringify(req.body, null, 2);
+   
+       s3.upload (uploadParams, function (err, data) {
+           if (err) {
+             console.log("Error", err);
+           } if (data) {
+             console.log("Upload Success", data.Location);
+           }
+         });
+          
+       res.status(200).json(uploadParams.Body); 
+    });
+
 
 module.exports = router;
