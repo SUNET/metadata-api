@@ -64,5 +64,27 @@ router.post('/upload', function (req, res) {
        res.status(200).json(uploadParams.Body); 
     });
 
+//Function to list object from storage
+router.get('/list', function (req, res) {
+    
+    // Create S3 service object
+    var s3 = new AWS.S3();
+    
+    //Set parameters for aws-get-object
+    let params2 = {
+        Bucket: "bucket", 
+    }; 
+
+    params2.Bucket = process.env.Bucket;
+    console.log(params2);
+    
+    new AWS.S3().listObjects(params2, function(err, data) {
+        if (err) console.log(err, err.stack); 
+        else{
+            console.log(data);          
+            res.status(200).json(data); 
+        }   
+        });
+});
 
 module.exports = router;
