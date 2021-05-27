@@ -1,0 +1,20 @@
+version: '2'
+services:
+  api:
+    container_name: node-express-api
+    image: 'sunet/node-express-api'
+    ports:
+      - 80:4000
+    volumes:
+      #- "/etc/sapi/aws_params.json:/usr/src/app/aws_params.json"
+      - "/etc/sapi/aws_config.json:/usr/src/app/routes/aws_config.json"
+      #Config to mount JWT certificate
+      #- "/etc/ssl/private/sapi_key.pem:/etc/ssl/private/sapi_key.pem"
+      #- "/etc/ssl/certs/sapi_cert.pem:/etc/ssl/certs/sapi_cert.pem"
+    environment:
+      - Endpoint='https://<s3-storage-endpoint>'
+      - SELF=http://<ip-to-self>
+      - INDEX=http://<url-to-registry>/register
+      #Config to mount certificate for HTTPS
+      #- SSL_KEY=/etc/ssl/private/sapi_key.pem
+      #- SSL_CERT=/etc/ssl/certs/sapi_cert.pem
