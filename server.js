@@ -5,7 +5,7 @@ start server: node server.js
 Example request: curl --request GET http://<server_hostname>:4000/status
 
 */
-const version = "4.3"; //used for status answer
+const version = "0.4.3"; //used for status answer
 
 const http = require('http');
 const https = require('https');
@@ -19,6 +19,46 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PORT = process.env.PORT || 4000;
 const BACKEND = process.env.STORAGE || "S3";
 const PUSH = process.env.PUSH || "0"; //Define if push to index
+
+//Data for JWT-token generation & verification
+const AMOUNT_TOKENS = process.env.AMOUNT_TOKENS || "5"; //Define how many tokens to generate, default is 5
+const ISSUER = process.env.ISSUER || 'sapi-default-creator';
+const SUBJECT = process.env.SUBJECT || 'sapi-default-subject';
+const AUDIENCE = process.env.AUDIENCE || 'sapi-default-api-audience';
+const ENDPOINT = process.env.ENDPOINT || 'sapi-default-endpoint';
+const PRIVATE_TOKEN_CERT = process.env.PRIVATE_TOKEN_CERT;
+const PUBLIC_TOKEN_CERT = process.env.PUBLIC_TOKEN_CERT;
+
+
+//JWT-token Creation
+if(AMOUNT_TOKENS > 0 ){
+  var privateKEY  = fs.readFileSync(PRIVATE_TOKEN_CERT, 'utf8');
+  var publicKEY  = fs.readFileSync(PUBLIC_TOKEN_CERT, 'utf8');
+  
+  //JWT Properties
+  var signOptions = {
+    issuer:  ISSUER,
+    subject:  SUBJECT,
+    audience:  AUDIENCE,
+    expiresIn:  "365d",
+    algorithm:  "ES512"
+    };
+
+  var payload = {
+    data1: "Token for API endpoint",
+    endpoint: ENDPOINT
+  };
+
+  let tokens = {};
+
+  for(i =0; i<=AMOUNT_TOKENS; i++){
+    tokens[i] = jwt.sign(payload, privateKEY, signOptions);  
+  }
+  logger.info('created ' + AMOUNT_TOKENS + ' tokens saving to tokens.json');
+    
+  let data = JSON.stringify(tokens);
+  fs.writeFileSync('tokens.json', data); //save tokens to file
+}
 
 app.use(express.json());
 
@@ -70,7 +110,6 @@ app.use('/getMetadata', verifyToken, function (req, res) {
 
 app.use('/getManifest', function (req, res) {
   if(req.key.startsWith(metadata))
-    console.log("HELLO!!!");
   storageObject.getMetadata(req,res);
 });
 
@@ -106,18 +145,22 @@ app.put('/archiveObject', verifyToken, function (req, res) {
   storageObject.setPermissions(req,res);
 });
 
-// Middleware function to verify token if token is correct
+// Middleware function to verify token
 function verifyToken(req, res, next) {
-    const bearerHeader = req.headers['authorization']; // Get auth header value
-    if(typeof bearerHeader !== 'undefined') { // Check if bearer is undefined
-      const bearer = bearerHeader.split(' '); // Split at the space
-      const bearerToken = bearer[1]; // Get token from array
-      req.token = bearerToken; // Set the token
+  const bearerHeader = req.headers['authorization']; // Get auth header value
+  if(typeof bearerHeader !== 'undefined') { // Check if bearer is undefined
+    const bearer = bearerHeader.split(' '); // Split at the space
+    const bearerToken = bearer[1]; // Get token from array
+
+    jwt.verify(bearerToken, publicKEY, function(err, decoded) {
+      console.log("token was received and verified");
       next(); // Next function
-    } else {
-      res.sendStatus(403); // Forbidden
-    }
-  } 
+    });
+
+  } else {
+    res.sendStatus(403); // Forbidden
+  }
+} 
 
 //Use cert if available
 if (process.env.SSL_KEY && process.env.SSL_CERT) {
