@@ -5,7 +5,7 @@ start server: node server.js
 Example request: curl --request GET http://<server_hostname>:4000/status
 
 */
-const version = "0.4.3"; //used for status answer
+const version = "0.4.4"; //used for status answer
 
 const http = require('http');
 const https = require('https');
@@ -14,11 +14,19 @@ const app = express();
 const fs = require('fs')
 const s3_obj = require('./class_s3.js');
 const JsonLdParser = require("jsonld-streaming-parser").JsonLdParser;
+const CryptoJS = require("crypto-js");
+const jwt  = require('jsonwebtoken');
+require('dotenv').config();
 
+//Controls from environment
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = process.env.PORT || 4000;
 const BACKEND = process.env.STORAGE || "S3";
-const PUSH = process.env.PUSH || "0"; //Define if push to index
+const PUSH = process.env.PUSH || "0";
+const ALLOW_OBJECTLIST = process.env.ALLOW_OBJECTLIST || "1";
+const RATE_LIMIT = process.env.RATE_LIMIT || 100; 
+const ALLOW_LOCK = process.env.ALLOW_LOCK || false;
+const LOGGING = process.env.ALLOW_LOGGING || false;
 
 //Data for JWT-token generation & verification
 const AMOUNT_TOKENS = process.env.AMOUNT_TOKENS || "5"; //Define how many tokens to generate, default is 5
@@ -29,6 +37,10 @@ const ENDPOINT = process.env.ENDPOINT || 'sapi-default-endpoint';
 const PRIVATE_TOKEN_CERT = process.env.PRIVATE_TOKEN_CERT;
 const PUBLIC_TOKEN_CERT = process.env.PUBLIC_TOKEN_CERT;
 
+//Setting up logging
+if(LOGGING == true){
+  logger.info('starting api server')
+}
 
 //JWT-token Creation
 if(AMOUNT_TOKENS > 0 ){
@@ -86,14 +98,16 @@ const limiter = rateLimit({
 //apply ratelimit to all requests
 app.use(limiter);
 
-let storageObject = new s3_obj();
+let storageObject = new s3_obj(ALLOW_OBJECTLIST);
 
 if(PUSH == "1"){
   storageObject.updateIndex(req, res);
+  logger.info("push to index enabled");
 }
 
 app.use('/status', function (req, res) {
-  res.status(200).json("HelloWorld, version: " + version);
+  res.status(200).json({ 'Version ': ' '+ version });
+  logger.info("sending status");
 });
 
 app.use('/getIndexInfo', verifyToken, function (req, res) {
@@ -122,7 +136,10 @@ app.put('/updateMetadata', verifyToken, function (req, res) {
 });
 
 app.put('/lockObject', verifyToken, function (req, res) {
-  storageObject.createLink(req,res);
+  if(ALLOW_LOCK)
+    storageObject.lockObject(req,res);
+  else
+    res.send("Object lock now allowed on this endpoint");
 });
 
 app.put('/setPermission', verifyToken, function (req, res) {

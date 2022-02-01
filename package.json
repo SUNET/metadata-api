@@ -5,12 +5,22 @@
         "start": "node server.js"
     },
     "dependencies": {
-        "aws-sdk": "^2.523.0",
+        "aws-sdk": "^2.685.0",
+        "axios": "^0.21.1",
         "body-parser": "^1.19.0",
+        "crypto-js": "^4.1.1",
+        "dotenv": "^8.2.0",
         "express": "^4.16.4",
-        "jsonwebtoken": "^8.5.1"
+        "express-rate-limit": "^5.2.3",
+        "jsonld": "^5.2.0",
+        "jsonld-streaming-parser": "^2.4.2",
+        "jsonwebtoken": "^8.5.1",
+        "jsrsasign": "^10.5.1",
+        "log-timestamp": "^0.3.0",
+        "pino": "^6.11.3",
+        "querystring": "^0.2.0"
     },
     "devDependencies": {
-        "nodemon": "^1.19.3"
+        "nodemon": "^2.0.15"
     }
 }

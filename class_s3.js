@@ -147,20 +147,40 @@ class s3_obj {
         res.status(200).send("set permissions ok");
     }
 
-    getObjectList(req,res){
+    getObjectList(req,res, CryptoJS){
         let self = this;
         let params = {};
         if (req.query.bucket)        
             params.Bucket = req.query.bucket;
         else res.status(400).send("error, no bucket provided in request");
+              
+            //Function to check how old the file is:
+            params.Key = ".metadata/objects.json";
+            var old = self.s3.headObject(params, function (error, response) {
+                if(error) {
+                    console.log(error);
+                    res.status(200).send("Objectlist not found"); 
+                } else {
+                    var date = response.LastModified; //Last modified date
+                    var d1 = new Date();
+                    var diff = d1-date;
+
+                    if((diff/1000)/60 > 5){ //list is old create new
+                        return true; 
+                    }
+                    else{ //new don't refresh
+                        return false; 
+                    }
+                }
+            });
         
-        //TODO Check if file is to old and then generate new list automatically
         //TODO return error if unable to save
-        if(req.query.generate==1){
-            this.s3.listObjects(params, function(err, data) {
+        delete params.Key; //Remove key used when checking age of objectlist
+        if(req.query.generate==1 && self.ALLOW_OBJECTLIST == 1 || old && self.ALLOW_OBJECTLIST == 1 ){
+            this.s3.listObjects(params, function(err, data,) {
                 if (err) {
                     console.log("Error from listObjects function", err);
-                } 
+                }
                 else {
                     var newObject = new Array();
                     const metadata = data.Contents;
@@ -174,47 +194,37 @@ class s3_obj {
                     //Create url for each object
                     newObject.forEach(function (item, index){
                         newObject[index].Url = self.s3.config.endpoint + "/" + params.Bucket + "/" + newObject[index].Key;
-                        //TODO read permissions on file and save to same object as .permission
+                        newObject[index].SHA256Hash = 0;
+                        
+                        //newObject[index].SHA256Hash = self.makeHash(req, newObject[index].Key,CryptoJS); //Call function to make hash
                     })
+
+                    //Save new objectlist
                     params.Key = ".metadata/objects.json";
                     self.saveObject(newObject,params.Bucket,params.Key);
+                    
                     res.status(200).send(newObject); 
                 }
             });
         }
         
         else { 
-            params.Key = ".metadata/objects.json";
-            self.s3.headObject(params, function (error, response) {
-                if(error) {
-                    console.log(error);
-                    res.status(200).send("Objectlist not found"); 
-                } else {
-                    var date = response.LastModified; //Last modified date
-                    console.log("date before");
-                    console.log(date);
-                    var d1 = new Date();
-                    var diff = d1-date;
+            //Fetch objectlist from file
 
-                    console.log(diff);
-                    console.log("in minutes " + ((diff/1000)/60));
-                    if((diff/1000)/60 > 300){
-                        console.log("older than 5minutes");
-                    }
-                }
-                });
+            params.Key = ".metadata/objects.json";
 
             self.s3.getObject(params, function(err, data)
             {
                 if (!err){
-                    let jsonObject = JSON.parse(data.Body.toString()); //convert to json object
+                    let jsonObject = JSON.parse(data.Body.toString());
                     res.status(200).json(jsonObject);
                 }
                 else{
                     res.status(404);
                     console.log(err); 
                 }     
-            }).on("httpDone", function(response){ //DEBUG PURPOSES
+            }).on("httpDone", function(response){ 
+                //DEBUG PURPOSES
             });
         }
     }
@@ -237,7 +247,7 @@ class s3_obj {
         res.status(200).send(link);
         
         params.ACL = "public-read";
-        //console.log(self.params); //print for tracing purposes move to if(DEBUG)
+        
         self.s3.putObjectAcl(params, function(err, data) {
             if (err) {
                 console.log(err, err.stack); // an error occurred
@@ -337,6 +347,19 @@ class s3_obj {
             console.log(JSON.stringify(err) + " " + JSON.stringify(data));
             }
         );
+    }
+
+    //Dummy Function to hash object
+    makeHash(req, metadata,CryptoJS){
+        let self = this;
+        let params = {};
+        if (req.query.bucket)        
+            params.Bucket = req.query.bucket;
+        else res.status(400).send("error, no bucket provided in request");
+
+        params.Key = metadata;
+
+        return (0);
     }
 }
 
